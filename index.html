@@ -1,0 +1,1208 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Picture Maker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+            transform: translateY(-2px);
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #667eea;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        input, select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .edit-btn {
+            background: linear-gradient(135deg, #ff6f61, #ff9a76);
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .image-card {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-preview {
+            width: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .image-info {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .image-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .download-area {
+            text-align: center;
+            margin-top: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 15px;
+        }
+
+        .zoom-control, .position-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .zoom-slider, .position-slider {
+            flex-grow: 1;
+        }
+
+        .zoom-value, .position-value {
+            width: 60px;
+            text-align: right;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-preview {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            user-select: none;
+        }
+
+        .modal-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .control-group {
+                justify-content: space-between;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Profile Picture Maker</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📤</div>
+            <div class="upload-text">Drop your photos here or click to browse</div>
+            <div class="upload-subtext">Supports JPG, PNG, WEBP files</div>
+        </div>
+        
+        <input type="file" id="fileInput" multiple accept="image/*">
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="quality">Quality:</label>
+                <select id="quality">
+                    <option value="0.9">High (90%)</option>
+                    <option value="0.8" selected>Good (80%)</option>
+                    <option value="0.7">Medium (70%)</option>
+                    <option value="0.6">Low (60%)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="naming">File Naming:</label>
+                <select id="naming">
+                    <option value="original">Keep Original Names</option>
+                    <option value="custom">Custom Prefix + Numbers</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="prefixGroup" style="display: none;">
+                <label for="prefix">File Prefix:</label>
+                <input type="text" id="prefix" value="profile" placeholder="e.g., avatar, pic">
+            </div>
+            
+            <div class="control-group">
+                <label for="format">Output Format:</label>
+                <select id="format">
+                    <option value="jpeg">JPEG</option>
+                    <option value="png">PNG</option>
+                    <option value="webp">WebP</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="ratio">Aspect Ratio:</label>
+                <select id="ratio">
+                    <option value="4:5" selected>4:5</option>
+                    <option value="1:1">1:1 (Square)</option>
+                    <option value="4:3">4:3</option>
+                    <option value="16:9">16:9</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="customRatioGroup" style="display: none;">
+                <label>Custom Ratio:</label>
+                <input type="number" id="customWidthRatio" min="1" step="1" value="1" style="width: 60px;" placeholder="Width">
+                <span>:</span>
+                <input type="number" id="customHeightRatio" min="1" step="1" value="1" style="width: 60px;" placeholder="Height">
+            </div>
+            
+            <div class="control-group" style="flex-direction: column; width: 100%;">
+                <label for="zoom">Zoom Level:</label>
+                <div class="zoom-control">
+                    <input type="range" id="zoom" class="zoom-slider" min="1" max="3" step="0.1" value="1">
+                    <input type="number" id="zoomValue" class="zoom-value" min="1" max="3" step="0.1" value="1.0" style="width: 60px;">
+                </div>
+            </div>
+            
+            <button class="btn" id="processBtn" disabled>🎨 Create Profile Pictures</button>
+        </div>
+        
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="status" id="status"></div>
+        
+        <div class="gallery" id="gallery"></div>
+        
+        <div class="download-area" id="downloadArea" style="display: none;">
+            <h3>🎉 Profile Pictures Ready!</h3>
+            <p>Your cropped and customized profile pictures are ready for download.</p>
+            <button class="btn" id="downloadAllBtn">📦 Download All as ZIP</button>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <span class="modal-close" id="modalClose">×</span>
+            <h2>Edit Profile Picture</h2>
+            <img id="modalPreview" class="modal-preview" src="" alt="Preview">
+            <div class="modal-controls">
+                <div class="control-group">
+                    <label for="modalZoom">Zoom Level:</label>
+                    <div class="zoom-control">
+                        <input type="range" id="modalZoom" class="zoom-slider" min="1" max="3" step="0.1" value="1">
+                        <input type="number" id="modalZoomValue" class="zoom-value" min="1" max="3" step="0.1" value="1.0" style="width: 60px;">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="modalPosition">Position Preset:</label>
+                    <select id="modalPosition">
+                        <option value="center">Center</option>
+                        <option value="top-center">Top Center</option>
+                        <option value="bottom-center">Bottom Center</option>
+                        <option value="left-center">Left Center</option>
+                        <option value="right-center">Right Center</option>
+                        <option value="top-left">Top Left</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="bottom-right">Bottom Right</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="modalPositionX">Horizontal Position:</label>
+                    <div class="position-control">
+                        <input type="range" id="modalPositionX" class="position-slider" min="-100" max="100" step="1" value="0">
+                        <input type="number" id="modalPositionXValue" class="position-value" min="-100" max="100" step="1" value="0" style="width: 60px;">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="modalPositionY">Vertical Position:</label>
+                    <div class="position-control">
+                        <input type="range" id="modalPositionY" class="position-slider" min="-100" max="100" step="1" value="0">
+                        <input type="number" id="modalPositionYValue" class="position-value" min="-100" max="100" step="1" value="0" style="width: 60px;">
+                    </div>
+                </div>
+                <button class="btn" id="saveEditBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script>
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+            return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+                try {
+                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                    var firstSheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[firstSheetName];
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                    var filteredData = jsonData.filter(row => row.some(filledCell));
+                    var headerRowIndex = filteredData.findIndex((row, index) =>
+                        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                    );
+                    if (headerRowIndex === -1 || headerRowIndex > 25) {
+                        headerRowIndex = 0;
+                    }
+                    var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                    return csv;
+                } catch (e) {
+                    console.error(e);
+                    return "";
+                }
+            }
+            return gk_fileData[filename] || "";
+        }
+
+        let selectedFiles = [];
+        let processedImages = [];
+        let faceDetectionEnabled = false;
+        let currentEditIndex = null;
+        let tempBlob = null;
+        let positionX = 0;
+        let positionY = 0;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const gallery = document.getElementById('gallery');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const downloadArea = document.getElementById('downloadArea');
+        const naming = document.getElementById('naming');
+        const prefixGroup = document.getElementById('prefixGroup');
+        const zoomSlider = document.getElementById('zoom');
+        const zoomValue = document.getElementById('zoomValue');
+        const ratioSelect = document.getElementById('ratio');
+        const customRatioGroup = document.getElementById('customRatioGroup');
+        const customWidthRatio = document.getElementById('customWidthRatio');
+        const customHeightRatio = document.getElementById('customHeightRatio');
+
+        // Modal elements
+        const editModal = document.getElementById('editModal');
+        const modalClose = document.getElementById('modalClose');
+        const modalPreview = document.getElementById('modalPreview');
+        const modalZoom = document.getElementById('modalZoom');
+        const modalZoomValue = document.getElementById('modalZoomValue');
+        const modalPosition = document.getElementById('modalPosition');
+        const modalPositionX = document.getElementById('modalPositionX');
+        const modalPositionXValue = document.getElementById('modalPositionXValue');
+        const modalPositionY = document.getElementById('modalPositionY');
+        const modalPositionYValue = document.getElementById('modalPositionYValue');
+        const saveEditBtn = document.getElementById('saveEditBtn');
+
+        // Load face-api.js models
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+        ]).then(() => {
+            faceDetectionEnabled = true;
+            console.log('Face detection models loaded successfully');
+            status.textContent = 'Face detection ready. Upload images to create profile pictures.';
+        }).catch(err => {
+            faceDetectionEnabled = false;
+            console.error('Error loading face detection models:', err);
+            status.textContent = 'Face detection unavailable. Using center cropping instead.';
+        });
+
+        // Show/hide custom ratio inputs
+        ratioSelect.addEventListener('change', () => {
+            if (ratioSelect.value === 'custom') {
+                customRatioGroup.style.display = 'flex';
+            } else {
+                customRatioGroup.style.display = 'none';
+            }
+        });
+
+        // Update zoom value display in real-time and sync slider with input
+        zoomSlider.addEventListener('input', () => {
+            const value = parseFloat(zoomSlider.value).toFixed(1);
+            zoomValue.value = value;
+        });
+
+        zoomValue.addEventListener('input', () => {
+            let value = parseFloat(zoomValue.value);
+            if (isNaN(value)) value = 1;
+            value = Math.max(1, Math.min(3, value)); // Clamp between 1 and 3
+            zoomSlider.value = value;
+            zoomValue.value = value.toFixed(1);
+        });
+
+        modalZoom.addEventListener('input', () => {
+            const value = parseFloat(modalZoom.value).toFixed(1);
+            modalZoomValue.value = value;
+            updatePreview();
+        });
+
+        modalZoomValue.addEventListener('input', () => {
+            let value = parseFloat(modalZoomValue.value);
+            if (isNaN(value)) value = 1;
+            value = Math.max(1, Math.min(3, value)); // Clamp between 1 and 3
+            modalZoom.value = value;
+            modalZoomValue.value = value.toFixed(1);
+            updatePreview();
+        });
+
+        modalPositionX.addEventListener('input', () => {
+            positionX = parseFloat(modalPositionX.value);
+            modalPositionXValue.value = positionX;
+            updatePreview();
+        });
+
+        modalPositionXValue.addEventListener('input', () => {
+            let value = parseFloat(modalPositionXValue.value);
+            if (isNaN(value)) value = 0;
+            value = Math.max(-100, Math.min(100, value)); // Clamp between -100 and 100
+            positionX = value;
+            modalPositionX.value = value;
+            modalPositionXValue.value = value;
+            updatePreview();
+        });
+
+        modalPositionY.addEventListener('input', () => {
+            positionY = parseFloat(modalPositionY.value);
+            modalPositionYValue.value = positionY;
+            updatePreview();
+        });
+
+        modalPositionYValue.addEventListener('input', () => {
+            let value = parseFloat(modalPositionYValue.value);
+            if (isNaN(value)) value = 0;
+            value = Math.max(-100, Math.min(100, value)); // Clamp between -100 and 100
+            positionY = value;
+            modalPositionY.value = value;
+            modalPositionYValue.value = value;
+            updatePreview();
+        });
+
+        // Show/hide prefix input based on naming choice
+        naming.addEventListener('change', () => {
+            if (naming.value === 'custom') {
+                prefixGroup.style.display = 'flex';
+            } else {
+                prefixGroup.style.display = 'none';
+            }
+        });
+
+        // Upload area interactions
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files);
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            const imageFiles = files.filter(file => file.type.startsWith('image/'));
+            selectedFiles = [...selectedFiles, ...imageFiles];
+            updateUI();
+        }
+
+        function updateUI() {
+            if (selectedFiles.length > 0) {
+                processBtn.disabled = false;
+                status.textContent = `${selectedFiles.length} image(s) selected`;
+            } else {
+                processBtn.disabled = true;
+                status.textContent = faceDetectionEnabled ? 'Upload images to create profile pictures.' : 'Face detection unavailable. Upload images for center cropping.';
+            }
+        }
+
+        processBtn.addEventListener('click', processImages);
+
+        async function processImages() {
+            if (selectedFiles.length === 0) return;
+
+            processBtn.disabled = true;
+            progressBar.style.display = 'block';
+            gallery.innerHTML = '';
+            processedImages = [];
+
+            const quality = parseFloat(document.getElementById('quality').value);
+            const namingOption = document.getElementById('naming').value;
+            const prefix = document.getElementById('prefix').value || 'profile';
+            const format = document.getElementById('format').value;
+            let ratio = document.getElementById('ratio').value;
+            const zoom = parseFloat(document.getElementById('zoom').value);
+
+            // Handle custom aspect ratio
+            if (ratio === 'custom') {
+                const widthRatio = parseInt(customWidthRatio.value) || 1;
+                const heightRatio = parseInt(customHeightRatio.value) || 1;
+                ratio = `${widthRatio}:${heightRatio}`;
+            }
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const progress = ((i + 1) / selectedFiles.length) * 100;
+                progressFill.style.width = `${progress}%`;
+                status.textContent = `Processing image ${i + 1} of ${selectedFiles.length}...`;
+
+                try {
+                    const croppedBlob = await cropImage(file, quality, format, ratio, zoom, 'center', 0, 0);
+                    let newFileName;
+                    
+                    if (namingOption === 'original') {
+                        const originalName = file.name;
+                        const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
+                        const newExt = format === 'jpeg' ? 'jpg' : format;
+                        newFileName = `${nameWithoutExt}.${newExt}`;
+                    } else {
+                        newFileName = `${prefix}_${String(i + 1).padStart(3, '0')}.${format === 'jpeg' ? 'jpg' : format}`;
+                    }
+                    
+                    processedImages.push({
+                        blob: croppedBlob,
+                        fileName: newFileName,
+                        originalName: file.name,
+                        file: file,
+                        quality: quality,
+                        format: format,
+                        ratio: ratio,
+                        zoom: zoom,
+                        position: 'center',
+                        positionX: 0,
+                        positionY: 0
+                    });
+
+                    displayProcessedImage(croppedBlob, newFileName, file.name, i);
+                } catch (error) {
+                    console.error('Error processing image:', error);
+                    status.textContent = `Error processing ${file.name}`;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            progressBar.style.display = 'none';
+            status.textContent = `✅ Successfully processed ${processedImages.length} image(s)`;
+            downloadArea.style.display = 'block';
+            processBtn.disabled = false;
+        }
+
+        async function cropImage(file, quality, format, ratio, zoomLevel, position, positionXOffset, positionYOffset) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Parse ratio
+                const [widthRatio, heightRatio] = ratio.split(':').map(Number);
+                const targetRatio = widthRatio / heightRatio;
+                const paddingFactor = 0.1; // 10% padding on each side
+
+                img.onload = async () => {
+                    let cropWidth, cropHeight, cropX, cropY;
+
+                    if (faceDetectionEnabled) {
+                        try {
+                            // Try to detect face
+                            const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+                            if (detections.length > 0) {
+                                // Use the first detected face
+                                const face = detections[0].detection.box;
+                                const faceCenterX = face.x + face.width / 2;
+                                const faceCenterY = face.y + face.height / 2;
+
+                                // Calculate base crop dimensions
+                                const baseCropWidth = Math.min(img.width, img.height * targetRatio);
+                                const baseCropHeight = baseCropWidth / targetRatio;
+
+                                // Add padding
+                                cropWidth = baseCropWidth * (1 + 2 * paddingFactor);
+                                cropHeight = baseCropWidth / targetRatio * (1 + 2 * paddingFactor);
+
+                                // Apply zoom
+                                cropWidth = cropWidth / zoomLevel;
+                                cropHeight = cropHeight / zoomLevel;
+
+                                // Position adjustments
+                                if (position === 'center') {
+                                    cropX = faceCenterX - cropWidth / 2;
+                                    cropY = faceCenterY - cropHeight / 2;
+                                } else if (position === 'top-center') {
+                                    cropX = faceCenterX - cropWidth / 2;
+                                    cropY = faceCenterY - cropHeight * 0.8;
+                                } else if (position === 'bottom-center') {
+                                    cropX = faceCenterX - cropWidth / 2;
+                                    cropY = faceCenterY - cropHeight * 0.2;
+                                } else if (position === 'left-center') {
+                                    cropX = faceCenterX - cropWidth * 0.8;
+                                    cropY = faceCenterY - cropHeight / 2;
+                                } else if (position === 'right-center') {
+                                    cropX = faceCenterX - cropWidth * 0.2;
+                                    cropY = faceCenterY - cropHeight / 2;
+                                } else if (position === 'top-left') {
+                                    cropX = faceCenterX - cropWidth * 0.8;
+                                    cropY = faceCenterY - cropHeight * 0.8;
+                                } else if (position === 'top-right') {
+                                    cropX = faceCenterX - cropWidth * 0.2;
+                                    cropY = faceCenterY - cropHeight * 0.8;
+                                } else if (position === 'bottom-left') {
+                                    cropX = faceCenterX - cropWidth * 0.8;
+                                    cropY = faceCenterY - cropHeight * 0.2;
+                                } else if (position === 'bottom-right') {
+                                    cropX = faceCenterX - cropWidth * 0.2;
+                                    cropY = faceCenterY - cropHeight * 0.2;
+                                }
+
+                                // Apply position offsets from sliders
+                                const scaleX = img.width / 200;
+                                const scaleY = img.height / 200;
+                                cropX += positionXOffset * scaleX;
+                                cropY += positionYOffset * scaleY;
+
+                                // Ensure crop stays within image boundaries
+                                cropX = Math.max(0, Math.min(cropX, img.width - cropWidth));
+                                cropY = Math.max(0, Math.min(cropY, img.height - cropHeight));
+                            } else {
+                                // No face detected, use center crop with position
+                                const sourceRatio = img.width / img.height;
+                                if (sourceRatio > targetRatio) {
+                                    cropHeight = img.height;
+                                    cropWidth = img.height * targetRatio;
+                                } else {
+                                    cropWidth = img.width;
+                                    cropHeight = img.width / targetRatio;
+                                }
+
+                                // Add padding
+                                cropWidth = cropWidth * (1 + 2 * paddingFactor);
+                                cropHeight = cropHeight * (1 + 2 * paddingFactor);
+
+                                // Apply zoom
+                                cropWidth = cropWidth / zoomLevel;
+                                cropHeight = cropHeight / zoomLevel;
+
+                                // Position adjustments
+                                if (position === 'center') {
+                                    cropX = (img.width - cropWidth) / 2;
+                                    cropY = (img.height - cropHeight) / 2;
+                                } else if (position === 'top-center') {
+                                    cropX = (img.width - cropWidth) / 2;
+                                    cropY = 0;
+                                } else if (position === 'bottom-center') {
+                                    cropX = (img.width - cropWidth) / 2;
+                                    cropY = img.height - cropHeight;
+                                } else if (position === 'left-center') {
+                                    cropX = 0;
+                                    cropY = (img.height - cropHeight) / 2;
+                                } else if (position === 'right-center') {
+                                    cropX = img.width - cropWidth;
+                                    cropY = (img.height - cropHeight) / 2;
+                                } else if (position === 'top-left') {
+                                    cropX = 0;
+                                    cropY = 0;
+                                } else if (position === 'top-right') {
+                                    cropX = img.width - cropWidth;
+                                    cropY = 0;
+                                } else if (position === 'bottom-left') {
+                                    cropX = 0;
+                                    cropY = img.height - cropHeight;
+                                } else if (position === 'bottom-right') {
+                                    cropX = img.width - cropWidth;
+                                    cropY = img.height - cropHeight;
+                                }
+
+                                // Apply position offsets from sliders
+                                const scaleX = img.width / 200;
+                                const scaleY = img.height / 200;
+                                cropX += positionXOffset * scaleX;
+                                cropY += positionYOffset * scaleY;
+
+                                // Ensure crop stays within image boundaries
+                                cropX = Math.max(0, Math.min(cropX, img.width - cropWidth));
+                                cropY = Math.max(0, Math.min(cropY, img.height - cropHeight));
+                            }
+                        } catch (err) {
+                            console.error('Face detection failed for image:', err);
+                            // Fallback to center crop with position
+                            const sourceRatio = img.width / img.height;
+                            if (sourceRatio > targetRatio) {
+                                cropHeight = img.height;
+                                cropWidth = img.height * targetRatio;
+                            } else {
+                                cropWidth = img.width;
+                                cropHeight = img.width / targetRatio;
+                            }
+
+                            // Add padding
+                            cropWidth = cropWidth * (1 + 2 * paddingFactor);
+                            cropHeight = cropHeight * (1 + 2 * paddingFactor);
+
+                            // Apply zoom
+                            cropWidth = cropWidth / zoomLevel;
+                            cropHeight = cropHeight / zoomLevel;
+
+                            // Position adjustments
+                            if (position === 'center') {
+                                cropX = (img.width - cropWidth) / 2;
+                                cropY = (img.height - cropHeight) / 2;
+                            } else if (position === 'top-center') {
+                                cropX = (img.width - cropWidth) / 2;
+                                cropY = 0;
+                            } else if (position === 'bottom-center') {
+                                cropX = (img.width - cropWidth) / 2;
+                                cropY = img.height - cropHeight;
+                            } else if (position === 'left-center') {
+                                cropX = 0;
+                                cropY = (img.height - cropHeight) / 2;
+                            } else if (position === 'right-center') {
+                                cropX = img.width - cropWidth;
+                                cropY = (img.height - cropHeight) / 2;
+                            } else if (position === 'top-left') {
+                                cropX = 0;
+                                cropY = 0;
+                            } else if (position === 'top-right') {
+                                cropX = img.width - cropWidth;
+                                cropY = 0;
+                            } else if (position === 'bottom-left') {
+                                cropX = 0;
+                                cropY = img.height - cropHeight;
+                            } else if (position === 'bottom-right') {
+                                cropX = img.width - cropWidth;
+                                cropY = img.height - cropHeight;
+                            }
+
+                            // Apply position offsets from sliders
+                            const scaleX = img.width / 200;
+                            const scaleY = img.height / 200;
+                            cropX += positionXOffset * scaleX;
+                            cropY += positionYOffset * scaleY;
+
+                            // Ensure crop stays within image boundaries
+                            cropX = Math.max(0, Math.min(cropX, img.width - cropWidth));
+                            cropY = Math.max(0, Math.min(cropY, img.height - cropHeight));
+                        }
+                    } else {
+                        // Face detection disabled, use center crop with position
+                        const sourceRatio = img.width / img.height;
+                        if (sourceRatio > targetRatio) {
+                            cropHeight = img.height;
+                            cropWidth = img.height * targetRatio;
+                        } else {
+                            cropWidth = img.width;
+                            cropHeight = img.width / targetRatio;
+                        }
+
+                        // Add padding
+                        cropWidth = cropWidth * (1 + 2 * paddingFactor);
+                        cropHeight = cropHeight * (1 + 2 * paddingFactor);
+
+                        // Apply zoom
+                        cropWidth = cropWidth / zoomLevel;
+                        cropHeight = cropHeight / zoomLevel;
+
+                        // Position adjustments
+                        if (position === 'center') {
+                            cropX = (img.width - cropWidth) / 2;
+                            cropY = (img.height - cropHeight) / 2;
+                        } else if (position === 'top-center') {
+                            cropX = (img.width - cropWidth) / 2;
+                            cropY = 0;
+                        } else if (position === 'bottom-center') {
+                            cropX = (img.width - cropWidth) / 2;
+                            cropY = img.height - cropHeight;
+                        } else if (position === 'left-center') {
+                            cropX = 0;
+                            cropY = (img.height - cropHeight) / 2;
+                        } else if (position === 'right-center') {
+                            cropX = img.width - cropWidth;
+                            cropY = (img.height - cropHeight) / 2;
+                        } else if (position === 'top-left') {
+                            cropX = 0;
+                            cropY = 0;
+                        } else if (position === 'top-right') {
+                            cropX = img.width - cropWidth;
+                            cropY = 0;
+                        } else if (position === 'bottom-left') {
+                            cropX = 0;
+                            cropY = img.height - cropHeight;
+                        } else if (position === 'bottom-right') {
+                            cropX = img.width - cropWidth;
+                            cropY = img.height - cropHeight;
+                        }
+
+                        // Apply position offsets from sliders
+                        const scaleX = img.width / 200;
+                        const scaleY = img.height / 200;
+                        cropX += positionXOffset * scaleX;
+                        cropY += positionYOffset * scaleY;
+
+                        // Ensure crop stays within image boundaries
+                        cropX = Math.max(0, Math.min(cropX, img.width - cropWidth));
+                        cropY = Math.max(0, Math.min(cropY, img.height - cropHeight));
+                    }
+
+                    // Set canvas size
+                    const outputWidth = 800;
+                    const outputHeight = outputWidth * (heightRatio / widthRatio);
+
+                    canvas.width = outputWidth;
+                    canvas.height = outputHeight;
+
+                    // Draw cropped and resized image
+                    ctx.drawImage(
+                        img,
+                        cropX, cropY, cropWidth, cropHeight,
+                        0, 0, outputWidth, outputHeight
+                    );
+
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error('Failed to create blob'));
+                        }
+                    }, `image/${format}`, quality);
+                };
+
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        function displayProcessedImage(blob, fileName, originalName, index) {
+            const imageCard = document.createElement('div');
+            imageCard.className = 'image-card';
+
+            const img = document.createElement('img');
+            img.className = 'image-preview';
+            img.src = URL.createObjectURL(blob);
+            img.style.aspectRatio = processedImages[index].ratio.replace(':', '/');
+
+            const info = document.createElement('div');
+            info.className = 'image-info';
+            info.innerHTML = `
+                <div class="image-name">${fileName}</div>
+                <div>Original: ${originalName}</div>
+                <div>Size: ${(blob.size / 1024).toFixed(1)} KB</div>
+                <div>Zoom: ${processedImages[index].zoom.toFixed(1)}x</div>
+                <div>Position: ${processedImages[index].position.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+            `;
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn edit-btn';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', () => openEditModal(index));
+
+            imageCard.appendChild(img);
+            imageCard.appendChild(info);
+            imageCard.appendChild(editBtn);
+            gallery.appendChild(imageCard);
+
+            // Add click to download individual image
+            img.addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                link.click();
+            });
+        }
+
+        // Debounce function for zoom and position updates
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function openEditModal(index) {
+            currentEditIndex = index;
+            const imageData = processedImages[index];
+            modalPreview.src = URL.createObjectURL(imageData.blob);
+            modalZoom.value = imageData.zoom;
+            modalZoomValue.value = imageData.zoom.toFixed(1);
+            modalPosition.value = imageData.position;
+            positionX = imageData.positionX;
+            positionY = imageData.positionY;
+            modalPositionX.value = positionX;
+            modalPositionXValue.value = positionX;
+            modalPositionY.value = positionY;
+            modalPositionYValue.value = positionY;
+            tempBlob = imageData.blob;
+            editModal.style.display = 'flex';
+        }
+
+        // Real-time update function for zoom and position
+        const updatePreview = debounce(async () => {
+            if (currentEditIndex === null) return;
+
+            const imageData = processedImages[currentEditIndex];
+            const newZoom = parseFloat(modalZoom.value);
+            const newPosition = modalPosition.value;
+
+            try {
+                const newBlob = await cropImage(
+                    imageData.file,
+                    imageData.quality,
+                    imageData.format,
+                    imageData.ratio,
+                    newZoom,
+                    newPosition,
+                    positionX,
+                    positionY
+                );
+                modalPreview.src = URL.createObjectURL(newBlob);
+                tempBlob = newBlob;
+            } catch (error) {
+                console.error('Error updating preview:', error);
+            }
+        }, 300);
+
+        modalZoom.addEventListener('input', updatePreview);
+        modalPosition.addEventListener('change', () => {
+            positionX = 0;
+            positionY = 0;
+            modalPositionX.value = 0;
+            modalPositionXValue.value = 0;
+            modalPositionY.value = 0;
+            modalPositionYValue.value = 0;
+            updatePreview();
+        });
+
+        modalClose.addEventListener('click', () => {
+            editModal.style.display = 'none';
+            currentEditIndex = null;
+            tempBlob = null;
+            positionX = 0;
+            positionY = 0;
+        });
+
+        saveEditBtn.addEventListener('click', async () => {
+            if (currentEditIndex === null) return;
+
+            const imageData = processedImages[currentEditIndex];
+            const newZoom = parseFloat(modalZoom.value);
+            const newPosition = modalPosition.value;
+
+            status.textContent = 'Saving changes...';
+            try {
+                // Update processedImages array
+                processedImages[currentEditIndex] = {
+                    ...imageData,
+                    blob: tempBlob,
+                    zoom: newZoom,
+                    position: newPosition,
+                    positionX: positionX,
+                    positionY: positionY
+                };
+
+                // Update gallery display
+                gallery.innerHTML = '';
+                processedImages.forEach((imgData, idx) => {
+                    displayProcessedImage(imgData.blob, imgData.fileName, imgData.originalName, idx);
+                });
+
+                status.textContent = 'Image updated successfully!';
+                editModal.style.display = 'none';
+                currentEditIndex = null;
+                tempBlob = null;
+                positionX = 0;
+                positionY = 0;
+            } catch (error) {
+                console.error('Error saving changes:', error);
+                status.textContent = 'Error saving changes';
+            }
+        });
+
+        document.getElementById('downloadAllBtn').addEventListener('click', async () => {
+            if (processedImages.length === 0) return;
+
+            const zip = new JSZip();
+            
+            processedImages.forEach(img => {
+                zip.file(img.fileName, img.blob);
+            });
+
+            try {
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `profile_pics_${Date.now()}.zip`;
+                link.click();
+            } catch (error) {
+                console.error('Error creating ZIP:', error);
+                status.textContent = 'Error creating ZIP file';
+            }
+        });
+
+        // Clear processed images when new files are selected
+        fileInput.addEventListener('change', () => {
+            processedImages = [];
+            downloadArea.style.display = 'none';
+            gallery.innerHTML = '';
+        });
+    </script>
+</body>
+</html>
